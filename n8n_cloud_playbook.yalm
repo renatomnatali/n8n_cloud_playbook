@@ -1,0 +1,148 @@
+about: >
+  Playbook operacional para n8n Cloud (v1.104.0). Contém padrões,
+  arquitetura recomendada e checklist para gerar/ajustar workflows sem erros.
+
+order_of_import:
+  - sub_workflows_first: "Ex.: Generate-Post"
+  - autonomous_flows: ["ApprovalWebhook", "Publisher"]
+  - orchestrator_last: "Ex.: DailyManager"
+
+node_compatibility:
+  latest_node_versions: "Usar sempre o maior typeVersion disponível."
+  schedule_trigger: "Substitui Cron. type: n8n-nodes-base.scheduleTrigger (typeVersion >=1)."
+  openai_node_type: "Usar @n8n/n8n-nodes-langchain.openAi (resource: chat|image)."
+  verify_node_ids: "Antes de gerar JSON, pedir snippet 'View Node JSON' para copiar o campo 'type' se houver dúvida."
+  gray_node_tip: "Node cinza/? = ID incorreto ou recurso não instalado; substituir pelo ID real."
+  datastore_feature_flag: "Sem Datastore → usar Google Sheets ou Notion."
+
+export_guidelines:
+  - "Registrar versão do workspace (Settings ▸ About)."
+  - "Apenas nodes disponíveis nessa versão; confirmar 'type' e 'typeVersion'."
+  - "Connections: estrutura 'main': [[ { node, type, index } ]]."
+  - "Exportar active:false, incluir versionId, trocar segredos por placeholders."
+  - "Nunca expor chaves reais."
+  - "Validar JSON (sem undefined, ?, vírgulas sobrando)."
+  - "README: headers da planilha, payloads de exemplo, env vars."
+  - "Salvar playbook como arquivo versionado (ex.: n8n_cloud_playbook_v9.yaml)."
+
+deploy_checklist:
+  - "Importar na ordem definida."
+  - "Configurar credenciais (OpenAI, Gmail, Sheets, LinkedIn)."
+  - "Definir env vars / SPREADSHEET_ID."
+  - "Webhook público e Respond configurado."
+  - "Rodar smoke test e depois Activate."
+
+google_sheets_patterns:
+  - prefer_appendOrUpdate: "Evita rowIndex e cria/atualiza automaticamente."
+  - mapping_mode_controlled: "Se payload controlado (Set), Map Automatically."
+  - mapping_external_payload: "Se payload externo (Webhook cru), Map Each Column Manually para evitar colunas lixo."
+
+workflow_patterns:
+  pipeline_base: >
+    Trigger → Normalize → Validate → Enrich → Act → Persist → Notify.
+    n8n: Webhook/Schedule → Set (Keep only set=ON) → IF/Switch validação →
+    Enriquecer (HTTP/AI) → Ação (postar/gerar imagem) → Persistir (Sheets/Store Draft) →
+    Responder/Notificar (Respond to Webhook, Email).
+  orchestrator_subworkflows: >
+    Workflow mestre chama sub‑workflows reutilizáveis via node Workflow (waitForResponse=true quando precisar de dados).
+    Importar sub‑flows antes. Isola falhas e facilita reuso.
+  event_router: >
+    Após normalizar, usar Switch/IF para roteamento por tipo/status e acionar sub‑workflows específicos.
+  approval_loop: >
+    Recebe rascunho → salva (Store Draft/Sheets) → envia email com links (Webhook endpoints) para Aprovar/Revisar/Descartar →
+    cada Webhook atualiza status e segue para publicação ou coleta de revisão → sempre finalizar com Respond to Webhook.
+  scheduler_queue_batch: >
+    Schedule Trigger varre pendentes; usar Split In Batches/loop + Wait para controlar taxa;
+    processar item → marcar concluído.
+  async_response: >
+    Webhook responde rápido (Respond to Webhook) e processamento pesado segue em branch paralelo
+    que ao final notifica (Email/Slack).
+  retry_dead_letter: >
+    Envolver chamadas externas em lógica de tentativa (Function + Wait exponencial).
+    Contar tentativas; após N falhas salvar em coleção 'dead_letter' (Sheets/DB) para revisão manual.
+  idempotency: >
+    Criar chave única (id) e antes de agir consultar persistência; se já existe pular.
+    Em Webhooks públicos validar token/assinatura.
+  observability: >
+    Logging estruturado (timestamp, workflowId, itemId, status) em branch paralelo (HTTP Request/Sheets).
+    Métricas simples via contagem de linhas.
+  feature_flags_config: >
+    Parâmetros e toggles em env vars ou tabela de configurações.
+    Nunca hardcode de segredos.
+  test_harness: >
+    Clonar workflow para teste; usar Manual Trigger/Webhook Test com dados estáticos;
+    somente ativar após smoke test.
+  versioning_evolution: >
+    Alterações pequenas em cópia 'vNext'; depois substituir original.
+    Export sempre active:false. (Reforça seção 'versioning').
+  ai_enrichment: >
+    Após Normalize/Validate chamar Chat Model/AI Agent para sumarizar/gerar texto ou prompt de imagem;
+    salvar saída (Store Draft) para aprovação.
+  security_sanitization: >
+    Remover PII no Set antes de enviar à IA/persistir. Enviar ao Chat Model apenas campos necessários.
+  canonical_finalization: >
+    Todos os caminhos convergem em Respond to Webhook ou notificação final garantindo encerramento limpo.
+  minimal_branches: "Evitar Switch excessivo; usar expressões quando simples."
+  respond_webhook_node: "Fechar execuções com Respond to Webhook."
+  central_set_node: "Calcular status/flags num Set após o gatilho."
+  node_naming: "Verbo + Objeto (FindPost, SavePost)."
+  logging_monitoring: "Adicionar timestamp + Slack/Telegram/Write Binary em branch de erro."
+
+sheets_crud_flow:
+  recommended_structure: |
+    Schedule Trigger
+      ↓
+    Get Drafts (read)
+      ↓
+    Need New Post? (IF)
+        true → Generate Text (OpenAI chat)
+               → Image Prompt (Set)
+               → Generate Image (OpenAI image)
+               → Prepare Row (Set keepOnlySet=ON)
+               → Insert Row (append)
+               → Send Approval (Gmail)
+        false → fim
+
+data_sanitization:
+  - "Após Webhook: Set (Keep only set=ON) para achatar body.*, preservar apenas id/status/reviewComment."
+  - "Incluir sempre 'id' quando Keep only set=ON."
+  - "Verificar ícone ƒx em cada valor; evitar literais '{{ $json.* }}'."
+  - "Executar Set isolado e conferir ausência de 'undefined' antes de Sheets."
+
+hot_news_logic:
+  - "hot-score = 0.6*Mentions + 0.4*TrendingScore; se >=3 gerar post extra Draft."
+  - "Mesma arquitetura do DailyManager (texto/imagem/append)."
+
+testing:
+  - use_production_url: "Testar via Production URL para não ficar preso em Listening."
+  - confirm_options_exist: "Confirmar na UI que a opção/operation existe antes de instruir."
+  - webhook_debug: "Se preso em Waiting, parar com botão/Executions ou usar Production URL."
+
+troubleshooting:
+  - "Colunas extras em Sheets: revisar Map mode + Keep only set."
+  - "id vazio: verificar flatten do body e expressão correta ($json.body.id)."
+  - "Node cinza: corrigir 'type'."
+  - "Sem atualização: conferir updatedRows > 0 no output."
+
+versioning:
+  - "Incrementar sufixo (v9, v10...) sempre que atualizar este playbook."
+  - "Instrução global: 'Sempre consultar o n8n_cloud_playbook mais recente antes de gerar fluxos.'"
+
+# governance_change_control: >
+#   Processo de alteração: abrir issue → clonar workflow → testar → revisão → ativar → registrar mudança.
+
+# security_extra: >
+#   Rotação periódica de credenciais; uso de token HMAC nos Webhooks; mascarar PII em logs.
+
+# backups_export_automation: >
+#   Workflow semanal exporta todos os flows e envia para storage externo (Drive/S3) com timestamp.
+
+# kpis_success: >
+#   Exemplos: tempo_ciclo_aprovacao, posts_publicados_dia, taxa_erro (% falhas / execuções), SLA_publicacao.
+
+# prompt_engineering_guidelines: >
+#   Estrutura de prompt: contexto + instrução + formato de saída + limites. Evitar enviar PII.
+
+# roadmap:
+#   objetivo: >
+#     Para cada projeto n8n ativo deve ser criado um roadmap de evolução (fora deste playbook, ex.: Notion/Trello) com melhorias previstas.
