@@ -29,7 +29,8 @@ jobs:
           echo "Último arquivo: $latest_file"
 
           # Verifica se o último arquivo foi modificado neste push
-          if git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -q "$latest_file"; then
+          changes=$(git diff --name-only "${{ github.event.before }}" "$GITHUB_SHA")
+          if echo "$changes" | grep -q "$latest_file"; then
             current_version=$(echo "$latest_file" | sed -E 's/.*_v([0-9]+)\.yaml/\1/')
             next_version=$((current_version+1))
             new_file="n8n_cloud_playbook_v${next_version}.yaml"
