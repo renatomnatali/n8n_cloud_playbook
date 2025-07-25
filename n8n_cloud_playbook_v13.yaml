@@ -1,7 +1,6 @@
 about: >
   Playbook operacional para n8n Cloud (v1.104.0). Contém padrões,
   arquitetura recomendada e checklist para gerar/ajustar workflows sem erros.
-# teste
 order_of_import:
   - sub_workflows_first: "Ex.: Generate-Post"
   - autonomous_flows: ["ApprovalWebhook", "Publisher"]

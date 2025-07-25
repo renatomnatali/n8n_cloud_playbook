@@ -20,7 +20,12 @@ jobs:
 
       - name: Detect and bump version
         run: |
-          latest_file=$(ls -1 n8n_cloud_playbook_v*.yaml | sort -V | tail -n1)
+          set -euo pipefail
+          latest_file=$(ls -1 n8n_cloud_playbook_v*.yaml 2>/dev/null | sort -V | tail -n1)
+          if [ -z "$latest_file" ]; then
+            echo "No playbook found"
+            exit 0
+          fi
           echo "Último arquivo: $latest_file"
 
           # Verifica se o último arquivo foi modificado neste push
