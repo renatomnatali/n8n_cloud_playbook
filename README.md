@@ -1,6 +1,6 @@
 # n8n Cloud Playbook
 
-Este repositório contém o **Playbook operacional para n8n Cloud**. Ele foi pensado para ajudar assistentes de IA a gerar arquivos JSON de workflows prontos para serem importados no n8n Cloud com o mínimo de erros possíveis.
+Este repositório contém o **Playbook operacional para n8n Cloud**. Ele foi pensado para ajudar assistentes de IA a criar workflows em JSON seguindo diretrizes em YAML, prontos para serem importados no n8n Cloud com o mínimo de erros possíveis.
 
 Os arquivos `n8n_cloud_playbook_v*.yaml` trazem um conjunto de padrões, checklists e dicas práticas em português. Eles abordam pontos como ordenação de importação, compatibilidade de nodes, boas práticas de exportação e um passo a passo de revisão antes de ativar cada fluxo.
 
