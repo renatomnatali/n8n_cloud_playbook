@@ -29,22 +29,22 @@ jobs:
           echo "Último arquivo: $latest_file"
 
           # Verifica se o último arquivo foi modificado neste push
-          changes=$(git diff --name-only "${{ github.event.before }}" "$GITHUB_SHA")
-          if echo "$changes" | grep -q "$latest_file"; then
-            current_version=$(echo "$latest_file" | sed -E 's/.*_v([0-9]+)\.yaml/\1/')
-            next_version=$((current_version+1))
-            new_file="n8n_cloud_playbook_v${next_version}.yaml"
-
-            echo "Gerando nova versão: $new_file"
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-            # Cria cópia mantendo o histórico
-            cp "$latest_file" "$new_file"
-            git add "$new_file"
-
-            git commit -m "chore: bump playbook version to v${next_version} [skip ci]" || echo "Nada para commitar."
-            git push
-          else
+          if git diff --quiet "${{ github.event.before }}" "$GITHUB_SHA" -- "$latest_file"; then
             echo "O arquivo de maior versão não foi alterado neste commit; nada a fazer."
+            exit 0
           fi
+
+          current_version=$(echo "$latest_file" | sed -E 's/.*_v([0-9]+)\.yaml/\1/')
+          next_version=$((current_version+1))
+          new_file="n8n_cloud_playbook_v${next_version}.yaml"
+
+          echo "Gerando nova versão: $new_file"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Cria cópia mantendo o histórico
+          cp "$latest_file" "$new_file"
+          git add "$new_file"
+
+          git commit -m "chore: bump playbook version to v${next_version} [skip ci]" || echo "Nada para commitar."
+          git push
